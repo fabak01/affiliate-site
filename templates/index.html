@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>All Categories – Affiliate Guides</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-8">
+  <header class="max-w-3xl mx-auto text-center mb-12">
+    <h1 class="text-4xl font-bold">Welcome to Our SaaS Comparison Guides</h1>
+    <p class="mt-4 text-lg">Click a category below to compare top tools and start your free trial.</p>
+  </header>
+  <main class="max-w-3xl mx-auto">
+    <ul class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {% for page in pages %}
+      <li class="bg-white p-4 rounded shadow hover:bg-gray-100">
+        <a href="{{ page.slug }}.html" class="text-blue-600 hover:underline">
+          {{ page.phrase }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </main>
+</body>
+</html>

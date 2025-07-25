@@ -3,28 +3,19 @@ import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 from datetime import datetime
 
-# ── Helper: Cache & fetch tool blurbs via the new chat.completions endpoint ──
-def get_tool_blurb(tool_name):
-    df_cache = pd.read_csv("tool_blurbs.csv")
-    match = df_cache[df_cache.tool_name == tool_name]
-    if not match.empty:
-        return match.iloc[0].blurb
-    # Fallback if missing:
-    return f"Discover why {tool_name} could be the right choice for you."
-
-
 # ── Load data files ─────────────────────────────────────────────────────────
 df_phrases = pd.read_csv("keywords.csv")
 df_tools   = pd.read_csv("tools.csv")
 df_feats   = pd.read_csv("features.csv")
+# If you stub blurbs locally, you can skip openai imports here
 
+# Build maps (as before)
 tools_map = (
     df_tools
       .groupby("seed")[["tool_name","affiliate_link"]]
       .apply(lambda d: list(d.itertuples(index=False, name=None)))
       .to_dict()
 )
-
 feats_map = (
     df_feats
       .set_index("seed")
@@ -33,34 +24,49 @@ feats_map = (
 
 # ── Prepare Jinja2 ──────────────────────────────────────────────────────────
 env = Environment(loader=FileSystemLoader("templates"))
-template = env.get_template("page.html")
+page_tmpl  = env.get_template("page.html")
+index_tmpl = env.get_template("index.html")
+
+# Ensure output dir exists
 os.makedirs("dist", exist_ok=True)
 
-# ── Generate one page per keyword ──────────────────────────────────────────
+# ── Generate subpages and collect page info ────────────────────────────────
 seeds = list(tools_map.keys())
+pages = []
+
 for _, row in df_phrases.iterrows():
     phrase = row["phrase"]
-    seed = next((s for s in seeds if s in phrase.lower()), seeds[0])
+    seed   = next((s for s in seeds if s in phrase.lower()), seeds[0])
 
+    # tools & features as before (stubbed or via get_tool_blurb)
     raw_tools = tools_map.get(seed, [])
-    tools = []
-    for name, link in raw_tools:
-        blurb = get_tool_blurb(name)
-        tools.append({"name":name, "link":link, "blurb":blurb})
+    tools = [{"name":n,"link":l,"blurb":""} for n,l in raw_tools]  # remove blurb if you stub
 
     feats_dict = feats_map.get(seed, {})
     features = [feats_dict[k] for k in sorted(feats_dict) if feats_dict[k]]
 
+    # slugify phrase
     slug = phrase.lower().replace(" ", "-").replace("/", "-")
-    out_path = os.path.join("dist", f"{slug}.html")
 
-    html = template.render(
+    # render page.html → dist/<slug>.html
+    html = page_tmpl.render(
         phrase=phrase,
         year=datetime.now().year,
         tools=tools,
         features=features
     )
-    with open(out_path, "w", encoding="utf-8") as f:
+    out_file = os.path.join("dist", f"{slug}.html")
+    with open(out_file, "w", encoding="utf-8") as f:
         f.write(html)
 
-print(f"✅ Generated {len(df_phrases)} pages with dynamic blurbs in dist/")
+    # collect for index
+    pages.append({"slug": slug, "phrase": phrase})
+
+print(f"✅ Generated {len(pages)} subpages in dist/")
+
+# ── Render index.html → dist/index.html ────────────────────────────────────
+index_html = index_tmpl.render(pages=pages)
+with open(os.path.join("dist","index.html"), "w", encoding="utf-8") as f:
+    f.write(index_html)
+
+print("✅ Generated homepage at dist/index.html")
